@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Go Gin Passkey Example</title>
+</head>
+<body>
+  <div>
+    <h1>Passkey Demo (Go + Gin)</h1>
+  </div>
+  <div>
+    <label>Username: <input type="text" id="username" value="foo"></label>
+    <br/>
+    <button onclick="register()">Passkey 등록</button>
+    <button onclick="login()">Passkey로 로그인</button>
+  </div>
+  <div id="logs" />
+
+  <script>
+    // Log 유틸리티
+    const logEl = document.getElementById('logs');
+    function log(msg) {
+      logEl.innerText = `${logEl.innerText}\n${msg}`;
+    }
+
+    // Base64 URL-safe 인코딩/디코딩 유틸리티
+    function bufferDecode(value) {
+      return Uint8Array.from(atob(value.replace(/-/g, "+")
+        .replace(/_/g, "/")), c => c.charCodeAt(0));
+    }
+    function bufferEncode(value) {
+      return btoa(String.fromCharCode.apply(null, new Uint8Array(value)))
+        .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+    }
+
+    async function register() {
+      const username = document.getElementById('username').value;
+
+      try {
+        // 등록#1: 등록 요청
+        const beginRes = await fetch(`/register/begin/${username}`);
+        const options = await beginRes.json();
+
+        // 등록#3: 인증기 호출
+        log("[Register] call authenticator");
+        options.publicKey.challenge = bufferDecode(options.publicKey.challenge);
+        options.publicKey.user.id = bufferDecode(options.publicKey.user.id);
+        const credential = await navigator.credentials.create({ publicKey: options.publicKey });
+
+        // 등록#5: 서명 결과 전달
+        const credentialJSON = {
+          id: credential.id,
+          rawId: bufferEncode(credential.rawId),
+          type: credential.type,
+          response: {
+            attestationObject: bufferEncode(credential.response.attestationObject),
+            clientDataJSON: bufferEncode(credential.response.clientDataJSON),
+          },
+        };
+        const finishRes = await fetch(`/register/finish/${username}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(credentialJSON)
+        });
+
+        const finishJSON = await finishRes.json();
+        log("[Register] finished: " + JSON.stringify(finishJSON));
+      } catch (e) {
+        log("Error: " + e);
+        console.error(e);
+      }
+    }
+
+    async function login() {
+      const username = document.getElementById('username').value;
+      try {
+        // 인증#1: 로그인 요청
+        const beginRes = await fetch(`/login/begin/${username}`);
+        const options = await beginRes.json();
+
+        // 인증#3: 인증기 호출
+        log("[Login] call authenticator");
+        options.publicKey.challenge = bufferDecode(options.publicKey.challenge);
+        options.publicKey.allowCredentials.forEach(c => {
+          c.id = bufferDecode(c.id);
+        });
+        const assertion = await navigator.credentials.get({ publicKey: options.publicKey });
+
+        // 인증#5: 서명 결과 전달
+        const assertionJSON = {
+          id: assertion.id,
+          rawId: bufferEncode(assertion.rawId),
+          type: assertion.type,
+          response: {
+            authenticatorData: bufferEncode(assertion.response.authenticatorData),
+            clientDataJSON: bufferEncode(assertion.response.clientDataJSON),
+            signature: bufferEncode(assertion.response.signature),
+            userHandle: assertion.response.userHandle ? bufferEncode(assertion.response.userHandle) : null,
+          },
+        };
+        const finishRes = await fetch(`/login/finish/${username}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(assertionJSON)
+        });
+
+        const finishJSON = await finishRes.json();
+        log("[Login] finished: " + JSON.stringify(finishJSON));
+      } catch (e) {
+        log("Error: " + e);
+        console.error(e);
+      }
+    }
+  </script>
+</body>
+</html>
+
