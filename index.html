@@ -11,19 +11,19 @@
   <div>
     <label>Username: <input type="text" id="username" value="foo"></label>
     <br/>
-    <button onclick="register()">Passkey 등록</button>
-    <button onclick="login()">Passkey로 로그인</button>
+    <button onclick="register()">パスキー登録</button>
+    <button onclick="login()">パスキーでログイン</button>
   </div>
   <div id="logs" />
 
   <script>
-    // Log 유틸리티
+    // Log utilities
     const logEl = document.getElementById('logs');
     function log(msg) {
       logEl.innerText = `${logEl.innerText}\n${msg}`;
     }
 
-    // Base64 URL-safe 인코딩/디코딩 유틸리티
+    // Base64 URL-safe Endcode/Decode utilities
     function bufferDecode(value) {
       return Uint8Array.from(atob(value.replace(/-/g, "+")
         .replace(/_/g, "/")), c => c.charCodeAt(0));
@@ -37,17 +37,17 @@
       const username = document.getElementById('username').value;
 
       try {
-        // 등록#1: 등록 요청
+        // 登録#1: 登録リクエスト
         const beginRes = await fetch(`/register/begin/${username}`);
         const options = await beginRes.json();
 
-        // 등록#3: 인증기 호출
+        // 登録#3: 認証器呼び出し
         log("[Register] call authenticator");
         options.publicKey.challenge = bufferDecode(options.publicKey.challenge);
         options.publicKey.user.id = bufferDecode(options.publicKey.user.id);
         const credential = await navigator.credentials.create({ publicKey: options.publicKey });
 
-        // 등록#5: 서명 결과 전달
+        // 登録#5: 署名と送信
         const credentialJSON = {
           id: credential.id,
           rawId: bufferEncode(credential.rawId),
@@ -74,11 +74,11 @@
     async function login() {
       const username = document.getElementById('username').value;
       try {
-        // 인증#1: 로그인 요청
+        // 認証#1: ログインリクエスト
         const beginRes = await fetch(`/login/begin/${username}`);
         const options = await beginRes.json();
 
-        // 인증#3: 인증기 호출
+        // 認証#3: 認証器呼び出し
         log("[Login] call authenticator");
         options.publicKey.challenge = bufferDecode(options.publicKey.challenge);
         options.publicKey.allowCredentials.forEach(c => {
@@ -86,7 +86,7 @@
         });
         const assertion = await navigator.credentials.get({ publicKey: options.publicKey });
 
-        // 인증#5: 서명 결과 전달
+        // 認証#5: 署名と送信
         const assertionJSON = {
           id: assertion.id,
           rawId: bufferEncode(assertion.rawId),
